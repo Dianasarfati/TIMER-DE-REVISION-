@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Session de travail</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600&display=swap');
+
+  :root{
+    --bg: #14171A;
+    --surface: #1C2024;
+    --line: #2A2F34;
+    --ink: #ECEAE4;
+    --ink-muted: #8B9198;
+    --work: #D8A24A;
+    --work-dim: #4A3F2A;
+    --rest: #6B9080;
+    --rest-dim: #2C3B36;
+  }
+
+  *{ box-sizing:border-box; }
+
+  html,body{
+    margin:0; padding:0; height:100%;
+    background:var(--bg);
+    color:var(--ink);
+    font-family:'Inter', sans-serif;
+  }
+
+  body{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    min-height:100vh;
+    padding:32px 16px;
+  }
+
+  .panel{
+    width:100%;
+    max-width:420px;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:28px;
+  }
+
+  .session-label{
+    font-size:13px;
+    color:var(--ink-muted);
+    letter-spacing:0.02em;
+  }
+
+  .ring-wrap{
+    position:relative;
+    width:280px;
+    height:280px;
+  }
+
+  svg{ transform: rotate(-90deg); }
+
+  .ring-track{
+    fill:none;
+    stroke:var(--line);
+    stroke-width:6;
+  }
+
+  .ring-progress{
+    fill:none;
+    stroke-width:6;
+    stroke-linecap:round;
+    transition: stroke-dashoffset 0.4s ease, stroke 0.4s ease;
+  }
+
+  .ring-center{
+    position:absolute;
+    inset:0;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    gap:6px;
+  }
+
+  .time{
+    font-family:'Fraunces', serif;
+    font-optical-sizing:auto;
+    font-weight:500;
+    font-size:56px;
+    font-variant-numeric: tabular-nums;
+    line-height:1;
+    color:var(--ink);
+  }
+
+  .state-label{
+    font-size:13px;
+    color:var(--ink-muted);
+    min-height:16px;
+  }
+
+  .state-label.on{ color:var(--work); }
+  .state-label.paused{ color:var(--rest); }
+
+  .controls{
+    display:flex;
+    gap:12px;
+    width:100%;
+  }
+
+  button{
+    font-family:'Inter', sans-serif;
+    font-size:15px;
+    font-weight:500;
+    border:none;
+    border-radius:10px;
+    padding:14px 20px;
+    cursor:pointer;
+    transition: background 0.2s ease, opacity 0.2s ease, transform 0.1s ease;
+  }
+  button:active{ transform: scale(0.98); }
+
+  .btn-main{
+    flex:1;
+    background:var(--work);
+    color:#1A1508;
+  }
+  .btn-main.pause-mode{
+    background:var(--rest);
+    color:#101B17;
+  }
+  .btn-main:hover{ opacity:0.92; }
+
+  .btn-reset{
+    background:transparent;
+    color:var(--ink-muted);
+    border:1px solid var(--line);
+    padding:14px 16px;
+  }
+  .btn-reset:hover{ color:var(--ink); border-color:var(--ink-muted); }
+
+  .stats{
+    display:flex;
+    width:100%;
+    justify-content:space-between;
+    padding-top:4px;
+  }
+
+  .stat{
+    display:flex;
+    flex-direction:column;
+    gap:4px;
+  }
+  .stat:last-child{ align-items:flex-end; }
+
+  .stat-value{
+    font-family:'Fraunces', serif;
+    font-size:20px;
+    font-variant-numeric: tabular-nums;
+    color:var(--ink);
+  }
+  .stat-value.rest-color{ color:var(--rest); }
+
+  .stat-label{
+    font-size:12px;
+    color:var(--ink-muted);
+  }
+
+  .timeline{
+    width:100%;
+    height:10px;
+    border-radius:5px;
+    background:var(--surface);
+    overflow:hidden;
+    display:flex;
+    border:1px solid var(--line);
+  }
+
+  .seg{ height:100%; }
+  .seg.work{ background:var(--work); }
+  .seg.rest{ background:var(--rest); }
+
+  .done-msg{
+    font-size:13px;
+    color:var(--work);
+    text-align:center;
+    display:none;
+  }
+</style>
+</head>
+<body>
+
+<div class="panel">
+  <div class="session-label">Session — objectif 4h de travail effectif</div>
+
+  <div class="ring-wrap">
+    <svg width="280" height="280" viewBox="0 0 280 280">
+      <circle class="ring-track" cx="140" cy="140" r="126"></circle>
+      <circle id="ringProgress" class="ring-progress" cx="140" cy="140" r="126"
+        stroke="#D8A24A"
+        stroke-dasharray="791.7"
+        stroke-dashoffset="791.7"></circle>
+    </svg>
+    <div class="ring-center">
+      <div class="time" id="timeDisplay">00:00:00</div>
+      <div class="state-label" id="stateLabel">Prête à démarrer</div>
+    </div>
+  </div>
+
+  <div class="timeline" id="timeline"></div>
+
+  <div class="stats">
+    <div class="stat">
+      <div class="stat-value" id="workTotal">0 min</div>
+      <div class="stat-label">travail cumulé</div>
+    </div>
+    <div class="stat">
+      <div class="stat-value rest-color" id="restTotal">0 min</div>
+      <div class="stat-label">pauses cumulées</div>
+    </div>
+  </div>
+
+  <div class="done-msg" id="doneMsg">Objectif des 4h atteint. Belle session.</div>
+
+  <div class="controls">
+    <button class="btn-main" id="mainBtn">Commencer</button>
+    <button class="btn-reset" id="resetBtn">Réinitialiser</button>
+  </div>
+</div>
+
+<script>
+  const TARGET_SECONDS = 4 * 60 * 60; // 4h de travail effectif
+  const RING_CIRCUMFERENCE = 2 * Math.PI * 126;
+
+  let workSeconds = 0;
+  let restSeconds = 0;
+  let isRunning = false;   // en travail
+  let isPaused = false;    // en pause
+  let tickHandle = null;
+  let segments = []; // {type: 'work'|'rest', seconds}
+
+  const mainBtn = document.getElementById('mainBtn');
+  const resetBtn = document.getElementById('resetBtn');
+  const timeDisplay = document.getElementById('timeDisplay');
+  const stateLabel = document.getElementById('stateLabel');
+  const ringProgress = document.getElementById('ringProgress');
+  const workTotalEl = document.getElementById('workTotal');
+  const restTotalEl = document.getElementById('restTotal');
+  const timelineEl = document.getElementById('timeline');
+  const doneMsg = document.getElementById('doneMsg');
+
+  function formatTime(totalSeconds){
+    const h = Math.floor(totalSeconds / 3600);
+    const m = Math.floor((totalSeconds % 3600) / 60);
+    const s = Math.floor(totalSeconds % 60);
+    return [h,m,s].map(v => String(v).padStart(2,'0')).join(':');
+  }
+
+  function formatMin(totalSeconds){
+    const m = Math.round(totalSeconds / 60);
+    return m + ' min';
+  }
+
+  function currentSegment(){
+    if(segments.length === 0) return null;
+    return segments[segments.length - 1];
+  }
+
+  function addSecond(type){
+    let seg = currentSegment();
+    if(!seg || seg.type !== type){
+      seg = { type, seconds: 0 };
+      segments.push(seg);
+    }
+    seg.seconds += 1;
+  }
+
+  function renderTimeline(){
+    timelineEl.innerHTML = '';
+    const total = workSeconds + restSeconds;
+    if(total === 0) return;
+    segments.forEach(seg => {
+      const div = document.createElement('div');
+      div.className = 'seg ' + (seg.type === 'work' ? 'work' : 'rest');
+      div.style.width = ((seg.seconds / total) * 100) + '%';
+      timelineEl.appendChild(div);
+    });
+  }
+
+  function render(){
+    if(isPaused){
+      timeDisplay.textContent = formatTime(restSeconds);
+      stateLabel.textContent = 'En pause';
+      stateLabel.className = 'state-label paused';
+    } else {
+      timeDisplay.textContent = formatTime(workSeconds);
+      stateLabel.textContent = isRunning ? 'Concentration en cours' : (workSeconds > 0 ? 'En pause du chrono' : 'Prête à démarrer');
+      stateLabel.className = 'state-label' + (isRunning ? ' on' : '');
+    }
+
+    const progress = Math.min(workSeconds / TARGET_SECONDS, 1);
+    const offset = RING_CIRCUMFERENCE * (1 - progress);
+    ringProgress.style.strokeDashoffset = offset;
+    ringProgress.setAttribute('stroke', isPaused ? '#6B9080' : '#D8A24A');
+
+    workTotalEl.textContent = formatMin(workSeconds);
+    restTotalEl.textContent = formatMin(restSeconds);
+
+    renderTimeline();
+
+    if(workSeconds >= TARGET_SECONDS){
+      doneMsg.style.display = 'block';
+    } else {
+      doneMsg.style.display = 'none';
+    }
+  }
+
+  function tick(){
+    if(isPaused){
+      restSeconds += 1;
+      addSecond('rest');
+    } else if(isRunning){
+      workSeconds += 1;
+      addSecond('work');
+    }
+    render();
+  }
+
+  function startTicking(){
+    if(tickHandle) return;
+    tickHandle = setInterval(tick, 1000);
+  }
+
+  mainBtn.addEventListener('click', () => {
+    if(!isRunning && !isPaused){
+      // démarrage initial
+      isRunning = true;
+      startTicking();
+    } else if(isRunning && !isPaused){
+      // passer en pause
+      isRunning = false;
+      isPaused = true;
+      mainBtn.textContent = 'Reprendre';
+      mainBtn.classList.add('pause-mode');
+    } else if(isPaused){
+      // reprendre le travail
+      isPaused = false;
+      isRunning = true;
+      mainBtn.textContent = 'Pause';
+      mainBtn.classList.remove('pause-mode');
+    }
+
+    if(mainBtn.textContent === 'Commencer'){
+      mainBtn.textContent = 'Pause';
+    }
+
+    render();
+  });
+
+  resetBtn.addEventListener('click', () => {
+    clearInterval(tickHandle);
+    tickHandle = null;
+    workSeconds = 0;
+    restSeconds = 0;
+    isRunning = false;
+    isPaused = false;
+    segments = [];
+    mainBtn.textContent = 'Commencer';
+    mainBtn.classList.remove('pause-mode');
+    render();
+  });
+
+  render();
+</script>
+
+</body>
+</html>
